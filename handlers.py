@@ -4,6 +4,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 
+from config import GROUP_ID
 from states import BloodPressure
 from sheets import append_to_sheet
 
@@ -66,26 +67,62 @@ async def process_pulse(message: types.Message, state: FSMContext):
     await message.answer(f"{summary}\nВсе верно?", reply_markup=confirm_kb)
 
 
+# @router.message(BloodPressure.waiting_for_confirm, F.text == "✅ Подтвердить")
+# async def process_confirm(message: types.Message, state: FSMContext):
+#     user_data = await state.get_data()
+#     now = datetime.now()
+#
+#     row = [now.strftime("%Y-%m-%d"), now.strftime("%H:%M"),
+#            user_data['systolic'], user_data['diastolic'], user_data['pulse']]
+#
+#     append_to_sheet(row)
+#     await state.clear()
+#     await message.answer("Сохранено!", reply_markup=ReplyKeyboardRemove())
+#
+#
+# # Находим этот обработчик в handlers.py
+#
+# @router.message(BloodPressure.waiting_for_confirm, F.text == "✅ Подтвердить")
+# async def process_confirm(message: types.Message, state: FSMContext):
+#     user_data = await state.get_data()
+#     now = datetime.now()
+#
+#     row = [
+#         now.strftime("%Y-%m-%d"),
+#         now.strftime("%H:%M"),
+#         user_data['systolic'],
+#         user_data['diastolic'],
+#         user_data['pulse']
+#     ]
+#
+#     # 1. Записываем в таблицу
+#     append_to_sheet(row)
+#
+#     # 2. Формируем текст уведомления для группы
+#     report_text = (
+#         f"📝 **Новая запись давления!**\n\n"
+#         f"📅 Дата: {row[0]}\n"
+#         f"🕒 Время: {row[1]}\n"
+#         f"🩸 Давление: {row[2]}/{row[3]}\n"
+#         f"💓 Пульс: {row[4] if row[4] else 'не указан'}"
+#     )
+#
+#     # 3. Отправляем сообщение в группу
+#     from config import GROUP_ID  # Импортируем ID группы внутри функции или сверху
+#     await message.bot.send_message(chat_id=GROUP_ID, text=report_text, parse_mode="Markdown")
+#
+#     # 4. Завершаем FSM и отвечаем пользователю
+#     await state.clear()
+#     await message.answer("Данные сохранены и отправлены в группу!", reply_markup=ReplyKeyboardRemove())
+
+
 @router.message(BloodPressure.waiting_for_confirm, F.text == "✅ Подтвердить")
 async def process_confirm(message: types.Message, state: FSMContext):
+    # 1. Получаем накопленные данные из памяти бота
     user_data = await state.get_data()
     now = datetime.now()
 
-    row = [now.strftime("%Y-%m-%d"), now.strftime("%H:%M"),
-           user_data['systolic'], user_data['diastolic'], user_data['pulse']]
-
-    append_to_sheet(row)
-    await state.clear()
-    await message.answer("Сохранено!", reply_markup=ReplyKeyboardRemove())
-
-
-# Находим этот обработчик в handlers.py
-
-@router.message(BloodPressure.waiting_for_confirm, F.text == "✅ Подтвердить")
-async def process_confirm(message: types.Message, state: FSMContext):
-    user_data = await state.get_data()
-    now = datetime.now()
-
+    # Подготавливаем список для таблицы
     row = [
         now.strftime("%Y-%m-%d"),
         now.strftime("%H:%M"),
@@ -94,22 +131,31 @@ async def process_confirm(message: types.Message, state: FSMContext):
         user_data['pulse']
     ]
 
-    # 1. Записываем в таблицу
-    append_to_sheet(row)
+    try:
+        # 2. Записываем в Google Таблицу
+        append_to_sheet(row)
 
-    # 2. Формируем текст уведомления для группы
-    report_text = (
-        f"📝 **Новая запись давления!**\n\n"
-        f"📅 Дата: {row[0]}\n"
-        f"🕒 Время: {row[1]}\n"
-        f"🩸 Давление: {row[2]}/{row[3]}\n"
-        f"💓 Пульс: {row[4] if row[4] else 'не указан'}"
-    )
+        # 3. Сразу формируем и отправляем сообщение в группу
+        report_text = (
+            f"✅ **Данные внесены в таблицу**\n\n"
+            f"📊 Давление: `{row[2]}/{row[3]}`\n"
+            f"💓 Пульс: `{row[4] if row[4] else '—'}`\n"
+            f"🕒 Время: {row[1]}"
+        )
 
-    # 3. Отправляем сообщение в группу
-    from config import GROUP_ID  # Импортируем ID группы внутри функции или сверху
-    await message.bot.send_message(chat_id=GROUP_ID, text=report_text, parse_mode="Markdown")
+        # Отправка в группу по ID из конфига
+        await message.bot.send_message(
+            chat_id=config.GROUP_ID,
+            text=report_text,
+            parse_mode="Markdown"
+        )
 
-    # 4. Завершаем FSM и отвечаем пользователю
-    await state.clear()
-    await message.answer("Данные сохранены и отправлены в группу!", reply_markup=ReplyKeyboardRemove())
+        # 4. Ответ пользователю и очистка состояния
+        await message.answer("Успешно записано в таблицу и отправлено в группу!", reply_markup=ReplyKeyboardRemove())
+
+    except Exception as e:
+        # Если что-то пошло не так (например, нет интернета)
+        await message.answer(f"Произошла ошибка при сохранении: {e}")
+
+    finally:
+        await state.clear()
