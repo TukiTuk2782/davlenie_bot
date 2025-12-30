@@ -1,18 +1,20 @@
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher
-from config import BOT_TOKEN
+import config  # Импортируем весь наш файл config.py
 from handlers import router
 
 
 async def main():
     logging.basicConfig(level=logging.INFO)
-    bot = Bot(token=BOT_TOKEN)
-    dp = Dispatcher()
 
-    # Регистрируем роутер из файла handlers
+    # Обращаемся именно так: config.BOT_TOKEN
+    bot = Bot(token=config.BOT_TOKEN)
+
+    dp = Dispatcher()
     dp.include_router(router)
 
+    print("Бот запущен...")
     await dp.start_polling(bot)
 
 
