@@ -77,3 +77,39 @@ async def process_confirm(message: types.Message, state: FSMContext):
     append_to_sheet(row)
     await state.clear()
     await message.answer("Сохранено!", reply_markup=ReplyKeyboardRemove())
+
+
+# Находим этот обработчик в handlers.py
+
+@router.message(BloodPressure.waiting_for_confirm, F.text == "✅ Подтвердить")
+async def process_confirm(message: types.Message, state: FSMContext):
+    user_data = await state.get_data()
+    now = datetime.now()
+
+    row = [
+        now.strftime("%Y-%m-%d"),
+        now.strftime("%H:%M"),
+        user_data['systolic'],
+        user_data['diastolic'],
+        user_data['pulse']
+    ]
+
+    # 1. Записываем в таблицу
+    append_to_sheet(row)
+
+    # 2. Формируем текст уведомления для группы
+    report_text = (
+        f"📝 **Новая запись давления!**\n\n"
+        f"📅 Дата: {row[0]}\n"
+        f"🕒 Время: {row[1]}\n"
+        f"🩸 Давление: {row[2]}/{row[3]}\n"
+        f"💓 Пульс: {row[4] if row[4] else 'не указан'}"
+    )
+
+    # 3. Отправляем сообщение в группу
+    from config import GROUP_ID  # Импортируем ID группы внутри функции или сверху
+    await message.bot.send_message(chat_id=GROUP_ID, text=report_text, parse_mode="Markdown")
+
+    # 4. Завершаем FSM и отвечаем пользователю
+    await state.clear()
+    await message.answer("Данные сохранены и отправлены в группу!", reply_markup=ReplyKeyboardRemove())
