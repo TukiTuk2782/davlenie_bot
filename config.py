@@ -1,23 +1,87 @@
+import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
+
 from dotenv import load_dotenv
 
-# Этот метод работает ВЕЗДЕ. Он берет путь к папке, где лежит САМ config.py
-# На сервере это будет, например, /var/www/bot, и код это поймет автоматически.
 BASE_DIR = Path(__file__).resolve().parent
-
-# Загружаем .env, который лежит в той же папке, что и этот скрипт
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 
-# Теперь достаем переменные
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
-SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE", "service_account.json")
+USERS_FILE = BASE_DIR / "users.json"
+DEFAULT_SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE", "service_account.json")
 
-GROUP_ID = -1003574487578
 
-# Проверка для тебя (в консоли сервера увидишь, если что-то не так)
-if not BOT_TOKEN:
-    print(f"❌ ОШИБКА: .env не найден или пуст в директории {BASE_DIR}")
-else:
-    print(f"✅ Бот успешно прочитал настройки из {BASE_DIR}")
+@dataclass(frozen=True)
+class BotProfile:
+    name: str
+    telegram_id: int
+    bot_token: str
+    spreadsheet_id: str
+    group_id: int
+    service_account_file: str
+
+    @property
+    def service_account_path(self) -> Path:
+        path = Path(self.service_account_file)
+        return path if path.is_absolute() else BASE_DIR / path
+
+    @property
+    def has_owner_restriction(self) -> bool:
+        return self.telegram_id != 0
+
+
+def _validate_unique(values: list[str], field_name: str) -> None:
+    duplicates = {value for value in values if values.count(value) > 1}
+    if duplicates:
+        duplicate_list = ", ".join(sorted(duplicates))
+        raise ValueError(f"Найдены дубли по полю {field_name}: {duplicate_list}")
+
+
+def load_bot_profiles() -> list[BotProfile]:
+    if not USERS_FILE.exists():
+        raise FileNotFoundError(
+            f"Файл конфигурации профилей не найден: {USERS_FILE}. "
+            "Создай users.json рядом со скриптом."
+        )
+
+    raw_data = json.loads(USERS_FILE.read_text(encoding="utf-8"))
+    user_items = raw_data.get("users", [])
+
+    if not isinstance(user_items, list):
+        raise ValueError("Поле 'users' в users.json должно быть списком.")
+
+    profiles: list[BotProfile] = []
+
+    for index, item in enumerate(user_items, start=1):
+        if not item.get("enabled", True):
+            continue
+
+        try:
+            profile = BotProfile(
+                name=item["name"],
+                telegram_id=int(item.get("telegram_id", 0)),
+                bot_token=item["bot_token"],
+                spreadsheet_id=item["spreadsheet_id"],
+                group_id=int(item["group_id"]),
+                service_account_file=item.get("service_account_file", DEFAULT_SERVICE_ACCOUNT_FILE),
+            )
+        except KeyError as exc:
+            raise ValueError(f"Не хватает поля {exc} в users.json для записи #{index}") from exc
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Некорректные типы данных в users.json для записи #{index}") from exc
+
+        profiles.append(profile)
+
+    if not profiles:
+        raise ValueError("В users.json нет ни одного активного профиля.")
+
+    _validate_unique([str(profile.bot_token) for profile in profiles], "bot_token")
+    _validate_unique([str(profile.telegram_id) for profile in profiles if profile.telegram_id != 0], "telegram_id")
+
+    return profiles
+
+
+BOT_PROFILES = load_bot_profiles()
+
+print(f"✅ Загружено профилей бота: {len(BOT_PROFILES)} из {USERS_FILE}")
