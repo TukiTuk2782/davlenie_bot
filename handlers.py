@@ -19,6 +19,8 @@ skip_kb = ReplyKeyboardMarkup(
     resize_keyboard=True,
 )
 
+UNAUTHORIZED_MESSAGE = "Сорян, у тебя нет доступа"
+
 
 def create_router(profile: BotProfile) -> Router:
     router = Router()
@@ -30,7 +32,7 @@ def create_router(profile: BotProfile) -> Router:
 
     @router.message(lambda message: not is_authorized(message))
     async def reject_unauthorized(message: types.Message):
-        await message.answer("Этот бот привязан к другому Telegram ID.")
+        await message.answer(UNAUTHORIZED_MESSAGE)
 
     @router.message(Command("get_id"), is_authorized)
     async def get_id(message: types.Message):
@@ -41,6 +43,11 @@ def create_router(profile: BotProfile) -> Router:
         await message.answer(
             f"Привет! Я бот для записи давления.\nПрофиль: {profile.name}\nИспользуй /add, чтобы начать."
         )
+
+    @router.message(Command("ref"), is_authorized)
+    async def cmd_ref(message: types.Message):
+        spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{profile.spreadsheet_id}/edit"
+        await message.answer(f"Твоя Google-таблица:\n{spreadsheet_url}")
 
     @router.message(Command("cancel"), is_authorized)
     @router.message(F.text.casefold() == "отмена", is_authorized)
