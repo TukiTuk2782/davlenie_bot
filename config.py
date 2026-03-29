@@ -18,7 +18,7 @@ class BotProfile:
     telegram_id: int
     bot_token: str
     spreadsheet_id: str
-    group_id: int
+    group_id: int | None
     service_account_file: str
 
     @property
@@ -63,7 +63,7 @@ def load_bot_profiles() -> list[BotProfile]:
                 telegram_id=int(item.get("telegram_id", 0)),
                 bot_token=item["bot_token"],
                 spreadsheet_id=item["spreadsheet_id"],
-                group_id=int(item["group_id"]),
+                group_id=int(item["group_id"]) if item.get("group_id") is not None else None,
                 service_account_file=item.get("service_account_file", DEFAULT_SERVICE_ACCOUNT_FILE),
             )
         except KeyError as exc:

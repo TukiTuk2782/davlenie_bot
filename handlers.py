@@ -124,11 +124,12 @@ def create_router(profile: BotProfile) -> Router:
                 f"🕒 Время: {row[1]}"
             )
 
-            await message.bot.send_message(
-                chat_id=profile.group_id,
-                text=report_text,
-                parse_mode="HTML",
-            )
+            if profile.group_id is not None:
+                await message.bot.send_message(
+                    chat_id=profile.group_id,
+                    text=report_text,
+                    parse_mode="HTML",
+                )
 
             await message.answer("✅ Данные успешно сохранены!", reply_markup=ReplyKeyboardRemove())
         except Exception as exc:
