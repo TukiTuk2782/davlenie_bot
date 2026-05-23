@@ -1,0 +1,29 @@
+{
+  "users": 
+  [
+    {
+      "name": "Никита",
+      "enabled": true,
+      "telegram_id": 1816217507,
+      "bot_token": "8504421553:AAFyzGugHGxWdFz4j9x87facB-zX_3sVdwg",
+      "spreadsheet_id": "1bddN_z_xUEsha0kNc1fFaLO8RYTwzCxmoXrMh7Ycms0",
+      "group_id": -1003574487578
+    },
+    {
+      "name": "Антонина",
+      "enabled": true,
+      "telegram_id": 659283736,
+      "bot_token": "7986958584:AAF8D08yJo2qvpiIt8TNZpy1EI7tpohvY1Q",
+      "spreadsheet_id": "1VkU6ayEwSjLsyJa7ZJtGbZNYxMjhbqLIFItgyIbDh6U",
+      "group_id": -4998517169
+    },
+    {
+      "name": "Андрей",
+      "enabled": true,
+      "telegram_id": 402027829,
+      "bot_token": "7986958584:AAF8D08yJo2qvpiIt8TNZpy1EI7tpohvY1Q",
+      "spreadsheet_id": "11I1-oqWpxKWcj0J8p7eOAZyK5mH4dpWXaA7XalC4g08",
+      "group_id": -5178474933
+    }
+  ]
+}

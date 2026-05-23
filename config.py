@@ -38,6 +38,15 @@ def _validate_unique(values: list[str], field_name: str) -> None:
         raise ValueError(f"Найдены дубли по полю {field_name}: {duplicate_list}")
 
 
+def _validate_unique_profile_routes(profiles: list["BotProfile"]) -> None:
+    routes = [
+        f"{profile.bot_token}:{profile.telegram_id}"
+        for profile in profiles
+        if profile.telegram_id != 0
+    ]
+    _validate_unique(routes, "bot_token + telegram_id")
+
+
 def load_bot_profiles() -> list[BotProfile]:
     if not USERS_FILE.exists():
         raise FileNotFoundError(
@@ -76,8 +85,7 @@ def load_bot_profiles() -> list[BotProfile]:
     if not profiles:
         raise ValueError("В users.json нет ни одного активного профиля.")
 
-    _validate_unique([str(profile.bot_token) for profile in profiles], "bot_token")
-    _validate_unique([str(profile.telegram_id) for profile in profiles if profile.telegram_id != 0], "telegram_id")
+    _validate_unique_profile_routes(profiles)
 
     return profiles
 

@@ -1,22 +1,25 @@
 import asyncio
 import logging
+from collections import defaultdict
 
 from aiogram import Bot, Dispatcher
 
 import config
-from handlers import create_router
+from handlers import create_router, create_unauthorized_router
 
 
-async def run_profile_bot(profile: config.BotProfile):
-    bot = Bot(token=profile.bot_token)
+async def run_bot_profiles(bot_token: str, profiles: list[config.BotProfile]):
+    bot = Bot(token=bot_token)
     dp = Dispatcher()
-    dp.include_router(create_router(profile))
+
+    for profile in profiles:
+        dp.include_router(create_router(profile))
+
+    dp.include_router(create_unauthorized_router(profiles))
 
     logging.info(
-        "Запуск профиля '%s' (telegram_id=%s, owner_restricted=%s)",
-        profile.name,
-        profile.telegram_id,
-        profile.has_owner_restriction,
+        "Запуск бота для профилей: %s",
+        ", ".join(profile.name for profile in profiles),
     )
 
     await dp.start_polling(bot, handle_signals=False)
@@ -25,12 +28,19 @@ async def run_profile_bot(profile: config.BotProfile):
 async def main():
     logging.basicConfig(level=logging.INFO)
 
+    profiles_by_token: dict[str, list[config.BotProfile]] = defaultdict(list)
+    for profile in config.BOT_PROFILES:
+        profiles_by_token[profile.bot_token].append(profile)
+
     tasks = [
-        asyncio.create_task(run_profile_bot(profile), name=f"bot:{profile.name}")
-        for profile in config.BOT_PROFILES
+        asyncio.create_task(
+            run_bot_profiles(bot_token, profiles),
+            name=f"bot:{','.join(profile.name for profile in profiles)}",
+        )
+        for bot_token, profiles in profiles_by_token.items()
     ]
 
-    print(f"Ботов запущено: {len(tasks)}")
+    print(f"Polling-сессий запущено: {len(tasks)}")
     await asyncio.gather(*tasks)
 
 

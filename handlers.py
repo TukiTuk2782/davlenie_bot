@@ -24,15 +24,12 @@ UNAUTHORIZED_MESSAGE = "Сорян, у тебя нет доступа"
 
 def create_router(profile: BotProfile) -> Router:
     router = Router()
+    router.message.filter(F.chat.type == "private")
 
     def is_authorized(message: types.Message) -> bool:
         if not profile.has_owner_restriction:
             return True
         return bool(message.from_user and message.from_user.id == profile.telegram_id)
-
-    @router.message(lambda message: not is_authorized(message))
-    async def reject_unauthorized(message: types.Message):
-        await message.answer(UNAUTHORIZED_MESSAGE)
 
     @router.message(Command("get_id"), is_authorized)
     async def get_id(message: types.Message):
@@ -41,13 +38,18 @@ def create_router(profile: BotProfile) -> Router:
     @router.message(Command("start"), is_authorized)
     async def cmd_start(message: types.Message):
         await message.answer(
-            f"Привет! Я бот для записи давления.\nПрофиль: {profile.name}\nИспользуй /add, чтобы начать."
+            f"Привет! Я бот для записи давления.\n"
+            f"Профиль: {profile.name}\n"
+            f"Используй /add, чтобы начать, или /ref для вывода ссылки на журнал давления."
         )
 
     @router.message(Command("ref"), is_authorized)
     async def cmd_ref(message: types.Message):
         spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{profile.spreadsheet_id}/edit"
-        await message.answer(f"Твоя Google-таблица:\n{spreadsheet_url}")
+        await message.answer(
+            f"Таблица давления для профиля {profile.name}:\n{spreadsheet_url}",
+            reply_markup=ReplyKeyboardRemove(),
+        )
 
     @router.message(Command("cancel"), is_authorized)
     @router.message(F.text.casefold() == "отмена", is_authorized)
@@ -140,5 +142,28 @@ def create_router(profile: BotProfile) -> Router:
             print(f"Ошибка сохранения для профиля {profile.name}: {exc}")
         finally:
             await state.clear()
+
+    return router
+
+
+def create_unauthorized_router(profiles: list[BotProfile]) -> Router:
+    router = Router()
+    router.message.filter(F.chat.type == "private")
+    allowed_ids = {
+        profile.telegram_id
+        for profile in profiles
+        if profile.has_owner_restriction
+    }
+    has_open_profile = any(not profile.has_owner_restriction for profile in profiles)
+
+    @router.message(
+        lambda message: (
+            not has_open_profile
+            and bool(message.from_user)
+            and message.from_user.id not in allowed_ids
+        )
+    )
+    async def reject_unauthorized(message: types.Message):
+        await message.answer(UNAUTHORIZED_MESSAGE)
 
     return router
